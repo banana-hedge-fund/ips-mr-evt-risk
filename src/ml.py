@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 """ML-расширение: признаки и мета-лейблинг MR-сделок.
 
-Идея (meta-labeling, в духе Lopez de Prado): базовая MR-стратегия генерирует
-сигналы входа; классификатор предсказывает, окажется ли сделка прибыльной,
-и фильтрует заведомо убыточные входы — снижая убытки.
+Идея (meta-labeling): базовая MR-стратегия генерирует сигналы входа;
+классификатор предсказывает, окажется ли сделка прибыльной, и фильтрует убыточные входы.
 
-Фичи строятся только из информации, доступной НА МОМЕНТ входа (без заглядывания
-вперёд): z-score, импульс, реализованная волатильность, режим, order-flow
-imbalance (taker-buy из klines), относительный объём, внутрибаровый диапазон,
-EWMA-тренд/детренд (разложение/сглаживание), RSI-подобный осциллятор, час суток.
+Цена и доходности — в логарифмах; объём — через log1p перед z-оценкой (тяжёлые хвосты);
+imbalance — безразмерная доля; сглаживание — SMA (в сигнале) + EWMA (тренд/детренд).
 """
 from __future__ import annotations
 import numpy as np
@@ -40,8 +37,9 @@ def build_features(df: pd.DataFrame, p: BTParams = BTParams()):
         f["taker_ratio"] = (tb / vv).clip(0, 1)
     else:
         f["taker_ratio"] = 0.5
-    vmean = df["volume"].rolling(60).mean(); vstd = df["volume"].rolling(60).std()
-    f["vol_z"] = ((df["volume"] - vmean) / vstd).clip(-5, 5)
+    lv = np.log1p(df["volume"])  # объём тяжелохвостый -> log1p перед z-оценкой
+    vmean = lv.rolling(60).mean(); vstd = lv.rolling(60).std()
+    f["vol_z"] = ((lv - vmean) / vstd).clip(-5, 5)
     f["hl_range"] = ((df["high"] - df["low"]) / df["close"]).rolling(15).mean()
     ew = logp.ewm(span=30).mean()
     f["ewma_slope"] = ew.diff(5)
