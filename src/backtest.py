@@ -6,11 +6,8 @@
   - сигнал: z-score цены относительно скользящего среднего (пересечение порогов);
   - intraday: принудительное закрытие позиции в конце каждых суток (ежедневный чекпоинт).
 
-Две конфигурации:
-  - baseline  — без риск-менеджмента (фиксированные параметры);
-  - adaptive  — риск-оверлей: размер позиции, порог входа, стоп и запрет
-                на новые входы зависят от режима хвостового риска.
-Проверка H4.
+Конфигурации: baseline (base_rp или BASELINE) и adaptive (режимный риск-оверлей).
+Параметры baseline можно передать через base_rp (для grid-search).
 """
 from __future__ import annotations
 import numpy as np
@@ -22,10 +19,10 @@ from .evt import classify_regime
 
 @dataclass
 class RegimeParams:
-    L: float          # размер позиции (доля)
-    k_entry: float    # порог входа по z-score
-    d_stop: float     # стоп-лосс (доля цены)
-    allow_new: bool   # разрешать открывать новые позиции
+    L: float
+    k_entry: float
+    d_stop: float
+    allow_new: bool
 
 
 ADAPTIVE_MAP = {
@@ -70,9 +67,10 @@ def _regime_series(sig: pd.DataFrame) -> pd.Series:
     return pd.Series(reg, index=sig.index)
 
 
-def backtest(df: pd.DataFrame, adaptive: bool, p: BTParams = BTParams()) -> dict:
+def backtest(df: pd.DataFrame, adaptive: bool, p: BTParams = BTParams(), base_rp: RegimeParams = None) -> dict:
     sig = compute_signals(df, p)
     regimes = _regime_series(sig) if adaptive else None
+    base = base_rp if base_rp is not None else BASELINE
 
     idx = sig.index
     z = sig["z"].values
@@ -88,7 +86,7 @@ def backtest(df: pd.DataFrame, adaptive: bool, p: BTParams = BTParams()) -> dict
     n_trades = 0
 
     for t in range(len(idx)):
-        rp = ADAPTIVE_MAP[regimes.iloc[t]] if adaptive else BASELINE
+        rp = ADAPTIVE_MAP[regimes.iloc[t]] if adaptive else base
         regime_arr[t] = regimes.iloc[t] if adaptive else "R_N"
         new_day = t > 0 and days[t] != days[t - 1]
         zt = z[t]

@@ -1,0 +1,1 @@
+{"window": 120, "k_entry": 3.0, "d_stop": 0.03, "cooldown": 30, "selection": "minimax(train,test) of total-0.5*|MDD|"}
