@@ -1,13 +1,9 @@
 """Упрощённый бэктест mean-reversion стратегии по пересечению свечей.
 
-Упрощения (ускоренный режим, ИПС):
-  - исполнение по цене закрытия свечи (close-to-close), БЕЗ учёта ликвидности/стакана;
-  - издержки — только комиссия (по обороту);
-  - сигнал: z-score цены относительно скользящего среднего (пересечение порогов);
-  - intraday: принудительное закрытие позиции в конце каждых суток (ежедневный чекпоинт).
-
-Конфигурации: baseline (base_rp или BASELINE) и adaptive (режимный риск-оверлей).
-Параметры baseline можно передать через base_rp (для grid-search).
+Сигнал: z-score лог-цены относительно скользящего среднего + ОБЯЗАТЕЛЬНАЯ
+объёмная конфирмация: вход разрешён при z-оценке log-объёма ≥ vol_filter
+(отсекает низкообъёмный шум). Упрощения: close-to-close, без ликвидности,
+комиссия по обороту, intraday с ежедневным закрытием. Параметры baseline — через base_rp.
 """
 from __future__ import annotations
 import numpy as np
@@ -43,6 +39,7 @@ class BTParams:
     var_q: float = 0.99
     viol_window: int = 240
     cooldown: int = 10
+    vol_filter: float = -1e9   # порог z-оценки log-объёма для входа (-1e9 = выкл.)
 
 
 def compute_signals(df: pd.DataFrame, p: BTParams) -> pd.DataFrame:
@@ -57,6 +54,8 @@ def compute_signals(df: pd.DataFrame, p: BTParams) -> pd.DataFrame:
     var = -out["ret"].rolling(p.var_window).quantile(1 - p.var_q)
     out["breach"] = (out["ret"] < -var).astype(float)
     out["viol_rate"] = out["breach"].rolling(p.viol_window).mean()
+    lv = np.log1p(out["volume"])
+    out["vol_z"] = (lv - lv.rolling(p.rv_window).mean()) / lv.rolling(p.rv_window).std()
     return out
 
 
@@ -76,6 +75,7 @@ def backtest(df: pd.DataFrame, adaptive: bool, p: BTParams = BTParams(), base_rp
     z = sig["z"].values
     ret = sig["ret"].values
     close = sig["close"].values
+    vz = sig["vol_z"].values
     days = idx.normalize()
 
     pos = 0.0
@@ -105,7 +105,8 @@ def backtest(df: pd.DataFrame, adaptive: bool, p: BTParams = BTParams(), base_rp
 
         if cool > 0:
             cool -= 1
-        if pos == 0.0 and rp.allow_new and cool == 0:
+        vol_ok = (p.vol_filter <= -1e8) or (np.isfinite(vz[t]) and vz[t] >= p.vol_filter)
+        if pos == 0.0 and rp.allow_new and cool == 0 and vol_ok:
             if zt <= -rp.k_entry:
                 pos = +rp.L; entry_price = close[t]; n_trades += 1
             elif zt >= rp.k_entry:
