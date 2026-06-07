@@ -36,9 +36,13 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
     unit = "us" if ot.iloc[0] > 1e15 else "ms"
     df = df.copy()
     df["dt"] = pd.to_datetime(ot, unit=unit, utc=True)
-    for c in ["open", "high", "low", "close", "volume"]:
+    keep = ["dt", "open", "high", "low", "close", "volume"]
+    for opt in ["quote_volume", "count", "taker_buy_volume"]:
+        if opt in df.columns:
+            keep.append(opt)
+    for c in keep[1:]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
-    df = df[["dt", "open", "high", "low", "close", "volume"]]
+    df = df[keep]
     df = df.dropna(subset=["close"]).sort_values("dt").drop_duplicates("dt")
     return df.set_index("dt")
 
