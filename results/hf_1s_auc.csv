@@ -1,0 +1,7 @@
+horizon,features,auc
+1,price,0.707
+1,price+book,0.799
+5,price,0.639
+5,price+book,0.709
+10,price,0.596
+10,price+book,0.656

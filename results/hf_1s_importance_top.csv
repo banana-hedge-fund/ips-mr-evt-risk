@@ -1,0 +1,9 @@
+feature,importance
+imb_l1,0.2156
+imb_ln,0.1397
+depth_imb,0.1169
+micro_dev,0.0897
+rvol,0.0707
+r1,0.0516
+ofi_ln,0.0492
+mom_3,0.0415
