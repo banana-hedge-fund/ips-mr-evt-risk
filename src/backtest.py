@@ -1,9 +1,9 @@
 """Упрощённый бэктест mean-reversion стратегии по пересечению свечей.
 
-Сигнал: z-score лог-цены относительно скользящего среднего + ОБЯЗАТЕЛЬНАЯ
-объёмная конфирмация: вход разрешён при z-оценке log-объёма ≥ vol_filter
-(отсекает низкообъёмный шум). Упрощения: close-to-close, без ликвидности,
-комиссия по обороту, intraday с ежедневным закрытием. Параметры baseline — через base_rp.
+Сигнал: z-score лог-цены + обязательная объёмная конфирмация (vol_filter).
+Риск-оверлей (adaptive): режим по волатильности, доле VaR-нарушений и (опц.) живому
+индексу хвоста ξ из risk_overlay (передаётся через xi_series). Упрощения: close-to-close,
+без ликвидности, комиссия по обороту, intraday с ежедневным закрытием.
 """
 from __future__ import annotations
 import numpy as np
@@ -39,7 +39,7 @@ class BTParams:
     var_q: float = 0.99
     viol_window: int = 240
     cooldown: int = 10
-    vol_filter: float = -1e9   # порог z-оценки log-объёма для входа (-1e9 = выкл.)
+    vol_filter: float = -1e9
 
 
 def compute_signals(df: pd.DataFrame, p: BTParams) -> pd.DataFrame:
@@ -59,16 +59,18 @@ def compute_signals(df: pd.DataFrame, p: BTParams) -> pd.DataFrame:
     return out
 
 
-def _regime_series(sig: pd.DataFrame) -> pd.Series:
+def _regime_series(sig: pd.DataFrame, xi=None) -> pd.Series:
     vr = sig["vol_ratio"].fillna(1.0).values
     viol = sig["viol_rate"].fillna(0.0).values
-    reg = [classify_regime(float(v), 0.0, float(w)) for v, w in zip(vr, viol)]
+    xa = xi if xi is not None else np.zeros(len(vr))
+    reg = [classify_regime(float(v), float(x), float(w)) for v, x, w in zip(vr, xa, viol)]
     return pd.Series(reg, index=sig.index)
 
 
-def backtest(df: pd.DataFrame, adaptive: bool, p: BTParams = BTParams(), base_rp: RegimeParams = None) -> dict:
+def backtest(df: pd.DataFrame, adaptive: bool, p: BTParams = BTParams(), base_rp: RegimeParams = None, xi_series: pd.Series = None) -> dict:
     sig = compute_signals(df, p)
-    regimes = _regime_series(sig) if adaptive else None
+    _xi = xi_series.reindex(sig.index).ffill().fillna(0.0).values if xi_series is not None else None
+    regimes = _regime_series(sig, _xi) if adaptive else None
     base = base_rp if base_rp is not None else BASELINE
 
     idx = sig.index
