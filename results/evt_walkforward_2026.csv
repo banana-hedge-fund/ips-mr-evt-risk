@@ -1,0 +1,4 @@
+cfg,total,mdd,cvar
+baseline,-0.2053,-0.2358,0.0030
+garch_evt_OOS,-0.0755,-0.1106,0.0019
+garch_evt_in-sample,-0.0878,-0.1211,0.0019

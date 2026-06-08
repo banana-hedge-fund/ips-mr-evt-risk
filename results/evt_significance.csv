@@ -1,0 +1,4 @@
+pair,dmean,t_hac,pvalue
+garch_evt-var_only,1.31e-06,3.22,0.0013
+var_only-baseline,1.03e-06,1.63,0.1039
+garch_evt-baseline,2.34e-06,3.11,0.0019
