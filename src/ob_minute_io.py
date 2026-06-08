@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Загрузка ПОДНЕВНЫХ 1m-таблиц микроструктуры (orderbook_minute_{EX}_{SYM}_{YYYYMMDD}.parquet).
 
-Цена-сигнал = mid. Возвращает df, совместимый с пайплайном (close/ret/volume + OB-колонки).
-Работает на ЧАСТИЧНЫХ данных — берёт все доступные подневные файлы.
+Цена-сигнал = mid. Работает на ЧАСТИЧНЫХ данных. Доходности непрерывные
+(крипто 24/7); NaN ставится только на РЕАЛЬНЫХ разрывах (непоследовательные дни).
 """
 from __future__ import annotations
 import glob, pathlib
@@ -29,5 +29,8 @@ def load(exchange, symbol, src_dir):
     tbr=pd.to_numeric(df.get("taker_buy_ratio"),errors="coerce").fillna(0.5)
     df["taker_buy_volume"]=tbr*df["volume"]
     lm=np.log(df["close"])
-    df["ret"]=lm.groupby(df.index.date).diff()
+    ret=lm.diff()
+    gap=df.index.to_series().diff()>pd.Timedelta(minutes=1)  # реальные разрывы
+    ret[gap]=np.nan
+    df["ret"]=ret
     return df.dropna(subset=["close"])
