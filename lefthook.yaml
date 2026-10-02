@@ -1,0 +1,27 @@
+# Git hooks for ips-mr-evt-risk. Jobs call Justfile recipes.
+# https://lefthook.dev/configuration/
+
+pre-commit:
+  parallel: false
+  jobs:
+    - name: format
+      glob:
+        - "*.py"
+        - "requirements.txt"
+      run: just format
+      stage_fixed: true
+    - name: lint
+      glob:
+        - "*.py"
+        - "requirements.txt"
+      run: just lint
+    - name: build
+      glob:
+        - "*.py"
+        - "requirements.txt"
+      run: just build-debug
+
+pre-push:
+  jobs:
+    - name: test
+      run: just test
